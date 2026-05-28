@@ -148,7 +148,7 @@ values: {
 		}
 		migration: {
 			enabled: true
-			image:   "registry.k8s.io/kubectl:v1.36.1"
+			image:   "bitnami/kubectl:1.31.0"
 		}
 		podDisruptionBudget: {
 			enabled:      true
