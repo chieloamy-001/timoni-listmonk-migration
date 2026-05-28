@@ -11,7 +11,7 @@ values: {
 	image: {
 		repository: "listmonk/listmonk"
 		pullPolicy: "IfNotPresent"
-		tag:        "v6.0.0"
+		tag:        "v6.1.0"
 	}
 	serviceAccount: create: true
 	service: {
@@ -33,7 +33,11 @@ values: {
 		enabled: true
 		image: {
 			repository: "postgres"
-			tag:        "15"
+			tag:        "18"
+		}
+		migration: {
+			enabled: true
+			image:   "registry.k8s.io/kubectl:v1.36.1"
 		}
 		storage: size: "4Gi"
 	}

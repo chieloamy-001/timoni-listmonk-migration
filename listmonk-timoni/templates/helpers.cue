@@ -1,9 +1,5 @@
 package templates
 
-import (
-	"strings"
-)
-
 #Helpers: {
 	#config: #Config
 
@@ -21,12 +17,7 @@ import (
 			#config.fullnameOverride
 		}
 		if #config.fullnameOverride == "" {
-			if strings.Contains(#config.metadata.name, name) {
-				#config.metadata.name
-			}
-			if !strings.Contains(#config.metadata.name, name) {
-				"\(#config.metadata.name)-\(name)"
-			}
+			"\(#config.metadata.name)-\(name)"
 		}
 	}
 

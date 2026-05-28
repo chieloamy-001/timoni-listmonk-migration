@@ -6,18 +6,18 @@ import (
 
 #Config: {
 	metadata: {
-		name:      string
-		namespace: string
+		name:      string | *"my-listmonk"
+		namespace: string | *"default"
 	}
-	moduleVersion: string
-	kubeVersion:   string
+	moduleVersion: string | *"6.0.0"
+	kubeVersion:   string | *"1.29.0"
 
 	replicaCount: int | *1
 
 	image: {
 		repository: string | *"listmonk/listmonk"
 		pullPolicy: string | *"IfNotPresent"
-		tag:        string | *"v6.0.0"
+		tag:        string | *"v6.1.0"
 	}
 
 	imagePullSecrets: [...corev1.#LocalObjectReference]
@@ -152,11 +152,11 @@ import (
 		enabled: bool | *true
 		image: {
 			repository: string | *"postgres"
-			tag:        string | *"15"
+			tag:        string | *"18"
 		}
 		migration: {
 			enabled: bool | *true
-			image:   string | *"bitnamilegacy/kubectl:1.29.9"
+			image:   string | *"registry.k8s.io/kubectl:v1.36.1"
 		}
 		podDisruptionBudget: {
 			enabled:      bool | *true
@@ -200,14 +200,6 @@ import (
 	init: {
 		enabled:   bool | *true
 		runAsHook: bool | *false
-	}
-
-	test: {
-		enabled: bool | *false
-		image?: {
-			repository: string
-			tag:        string
-		}
 	}
 }
 
