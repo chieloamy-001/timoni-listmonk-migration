@@ -201,6 +201,15 @@ import (
 		enabled:   bool | *true
 		runAsHook: bool | *false
 	}
+
+	test: {
+		enabled: bool | *false
+		image: {
+			repository: string | *"curlimages/curl"
+			tag:        string | *"latest"
+			pullPolicy: string | *"IfNotPresent"
+		}
+	}
 }
 
 #Instance: {
@@ -243,6 +252,12 @@ import (
 		"service": #Service & {#config: config, #helpers: #helpers}
 		if config.serviceAccount.create {
 			"serviceaccount": #ServiceAccount & {#config: config, #helpers: #helpers}
+		}
+	}
+
+	tests: {
+		if config.test.enabled {
+			"test-job": #TestJob & {#config: config}
 		}
 	}
 }

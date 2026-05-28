@@ -39,6 +39,12 @@ import (
 						"-c",
 						"""
 							set -e
+							# Wait for database to be ready
+							until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do
+							  echo "Waiting for database..."
+							  sleep 2
+							done
+
 							# Skip init if database already has tables (idempotent - never overwrite existing data)
 							if psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" | grep -qv "^0$"; then
 							  echo "Database already has tables, skipping init"
