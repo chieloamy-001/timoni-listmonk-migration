@@ -29,6 +29,7 @@ import (
 				"app.kubernetes.io/instance": #config.metadata.name
 			}
 			spec: corev1.#PodSpec & {
+				serviceAccountName: #helpers.serviceAccountName
 				containers: [{
 					name:            "postgres"
 					image:           "\(#config.postgres.image.repository):\(#config.postgres.image.tag)"

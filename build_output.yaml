@@ -1,0 +1,543 @@
+apiVersion: v1
+data:
+  LISTMONK_app__address: 0.0.0.0:9000
+  LISTMONK_app__lang: en
+  LISTMONK_db__database: listmonk
+  LISTMONK_db__host: listmonk-postgres
+  LISTMONK_db__max_idle: "25"
+  LISTMONK_db__max_lifetime: 300s
+  LISTMONK_db__max_open: "25"
+  LISTMONK_db__port: "5432"
+  LISTMONK_db__ssl_mode: disable
+  LISTMONK_db__user: listmonk
+  config.toml: |-
+    [app]
+    address = "0.0.0.0:9000"
+    lang = "en"
+
+    [db]
+    host = "listmonk-postgres"
+    port = 5432
+    user = "listmonk"
+    database = "listmonk"
+    ssl_mode = "disable"
+    max_open = 25
+    max_idle = 25
+    max_lifetime = "300s"
+    params = ""
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk
+  namespace: listmonk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk
+  namespace: listmonk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: my-listmonk
+      app.kubernetes.io/name: listmonk
+  template:
+    metadata:
+      annotations: {}
+      labels:
+        app.kubernetes.io/instance: my-listmonk
+        app.kubernetes.io/name: listmonk
+    spec:
+      affinity: {}
+      containers:
+      - env:
+        - name: LISTMONK_db__password
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: my-listmonk-listmonk-db
+        envFrom:
+        - configMapRef:
+            name: my-listmonk-listmonk
+        image: listmonk/listmonk:v6.1.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        name: listmonk
+        ports:
+        - containerPort: 9000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        volumeMounts:
+        - mountPath: /listmonk/config.toml
+          name: listmonk-config
+          subPath: config.toml
+      imagePullSecrets: []
+      initContainers:
+      - command:
+        - pg_isready
+        - -h
+        - listmonk-postgres
+        - -p
+        - "5432"
+        - -U
+        - listmonk
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: my-listmonk-listmonk-db
+        image: postgres:18
+        imagePullPolicy: IfNotPresent
+        name: wait-for-db
+      nodeSelector: {}
+      securityContext:
+        fsGroup: 1000
+      serviceAccountName: my-listmonk-listmonk
+      tolerations: []
+      volumes:
+      - configMap:
+          items:
+          - key: config.toml
+            path: config.toml
+          name: my-listmonk-listmonk
+        name: listmonk-config
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk-init
+  namespace: listmonk
+spec:
+  activeDeadlineSeconds: 600
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: init
+        app.kubernetes.io/instance: my-listmonk
+        app.kubernetes.io/name: listmonk
+    spec:
+      containers:
+      - command:
+        - /bin/sh
+        - -c
+        - |-
+          if [ -f /shared/skip ]; then
+            echo "DB already initialized, skipping install"
+            exit 0
+          fi
+          exec /listmonk/listmonk --install --yes
+        env:
+        - name: LISTMONK_ADMIN_USER
+          value: admin
+        - name: LISTMONK_ADMIN_PASSWORD
+          value: change-me
+        - name: LISTMONK_app__address
+          value: 0.0.0.0:9000
+        - name: LISTMONK_app__lang
+          value: en
+        - name: LISTMONK_db__host
+          value: listmonk-postgres
+        - name: LISTMONK_db__port
+          value: "5432"
+        - name: LISTMONK_db__user
+          value: listmonk
+        - name: LISTMONK_db__database
+          value: listmonk
+        - name: LISTMONK_db__ssl_mode
+          value: disable
+        - name: LISTMONK_db__max_open
+          value: "25"
+        - name: LISTMONK_db__max_idle
+          value: "25"
+        - name: LISTMONK_db__max_lifetime
+          value: 300s
+        - name: LISTMONK_db__password
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: my-listmonk-listmonk-db
+        image: listmonk/listmonk:v6.1.0
+        imagePullPolicy: IfNotPresent
+        name: listmonk-init
+        volumeMounts:
+        - mountPath: /listmonk/config.toml
+          name: listmonk-config
+          subPath: config.toml
+      imagePullSecrets: []
+      initContainers:
+      - command:
+        - /bin/sh
+        - -c
+        - |-
+          set -e
+          # Wait for database to be ready
+          until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+
+          # Skip init if database already has tables (idempotent - never overwrite existing data)
+          if psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" | grep -qv "^0$"; then
+            echo "Database already has tables, skipping init"
+            echo "skip" > /shared/skip
+          fi
+        env:
+        - name: PGHOST
+          value: listmonk-postgres
+        - name: PGPORT
+          value: "5432"
+        - name: PGUSER
+          value: listmonk
+        - name: PGDATABASE
+          value: listmonk
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: my-listmonk-listmonk-db
+        image: postgres:18
+        imagePullPolicy: IfNotPresent
+        name: db-check
+        volumeMounts:
+        - mountPath: /shared
+          name: init-flag
+      restartPolicy: OnFailure
+      volumes:
+      - emptyDir: {}
+        name: init-flag
+      - configMap:
+          items:
+          - key: config.toml
+            path: config.toml
+          name: my-listmonk-listmonk
+        name: listmonk-config
+  ttlSecondsAfterFinished: 300
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk
+  namespace: listmonk
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: my-listmonk
+      app.kubernetes.io/name: listmonk
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: listmonk-postgres
+  namespace: listmonk
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: my-listmonk
+      app.kubernetes.io/name: listmonk-postgres
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk-postgres-migration
+  namespace: listmonk
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      name: postgres-migration
+    spec:
+      containers:
+      - args:
+        - delete
+        - statefulset
+        - -n
+        - listmonk
+        - -l
+        - app.kubernetes.io/name=listmonk-postgres,app.kubernetes.io/instance=my-listmonk,app.kubernetes.io/managed-by=Helm
+        - --cascade=orphan
+        - --ignore-not-found
+        image: registry.k8s.io/kubectl:v1.36.1
+        name: migrate
+      restartPolicy: OnFailure
+      serviceAccountName: my-listmonk-listmonk-migration
+  ttlSecondsAfterFinished: 300
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-listmonk-listmonk-migration
+  namespace: listmonk
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: my-listmonk-listmonk-migration
+  namespace: listmonk
+rules:
+- apiGroups:
+  - apps
+  resourceNames:
+  - listmonk-postgres
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - delete
+  - patch
+- apiGroups:
+  - apps
+  resourceNames:
+  - listmonk-postgres
+  resources:
+  - statefulsets/scale
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: my-listmonk-listmonk-migration
+  namespace: listmonk
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: my-listmonk-listmonk-migration
+subjects:
+- kind: ServiceAccount
+  name: my-listmonk-listmonk-migration
+  namespace: listmonk
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk-db
+  namespace: listmonk
+stringData:
+  database: listmonk
+  password: change-me-postgres
+  username: listmonk
+type: Opaque
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: listmonk-postgres
+  namespace: listmonk
+spec:
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+  selector:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/name: listmonk-postgres
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: listmonk-postgres
+  namespace: listmonk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: my-listmonk
+      app.kubernetes.io/name: listmonk-postgres
+  serviceName: listmonk-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: my-listmonk
+        app.kubernetes.io/name: listmonk-postgres
+    spec:
+      containers:
+      - env:
+        - name: POSTGRES_USER
+          value: listmonk
+        - name: POSTGRES_DB
+          value: listmonk
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: my-listmonk-listmonk-db
+        image: postgres:18
+        imagePullPolicy: IfNotPresent
+        name: postgres
+        ports:
+        - containerPort: 5432
+          name: postgres
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -h
+            - localhost
+            - -U
+            - listmonk
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: data
+      serviceAccountName: my-listmonk-listmonk
+  volumeClaimTemplates:
+  - metadata:
+      labels:
+        app.kubernetes.io/instance: my-listmonk
+        app.kubernetes.io/name: listmonk-postgres
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk
+  namespace: listmonk
+spec:
+  ports:
+  - name: http
+    port: 9000
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/name: listmonk
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations: {}
+  labels:
+    app.kubernetes.io/instance: my-listmonk
+    app.kubernetes.io/managed-by: timoni
+    app.kubernetes.io/name: listmonk
+    app.kubernetes.io/version: 6.0.0
+    helm.sh/chart: listmonk-6.0.0
+  name: my-listmonk-listmonk
+  namespace: listmonk
+---

@@ -32,9 +32,10 @@ import (
 						args: [
 							"delete",
 							"statefulset",
-							"\(#helpers.postgresStatefulSetName)",
 							"-n",
 							"\(#config.metadata.namespace)",
+							"-l",
+							"app.kubernetes.io/name=\(#helpers.postgresStatefulSetName),app.kubernetes.io/instance=\(#config.metadata.name),app.kubernetes.io/managed-by=Helm",
 							"--cascade=orphan",
 							"--ignore-not-found",
 						]
