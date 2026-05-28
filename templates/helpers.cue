@@ -73,5 +73,5 @@ package templates
 		}
 	}
 
-	postgresStatefulSetName: "\(name)-postgres"
+	postgresStatefulSetName: "\(fullname)-postgres"
 }

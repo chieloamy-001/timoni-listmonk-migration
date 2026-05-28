@@ -64,7 +64,6 @@ import (
 		rules: [{
 			apiGroups: ["apps"]
 			resources: ["statefulsets"]
-			resourceNames: [#helpers.postgresStatefulSetName]
 			verbs: ["get", "list", "delete", "patch"]
 		}, {
 			apiGroups: ["apps"]
