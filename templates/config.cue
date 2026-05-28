@@ -156,7 +156,7 @@ import (
 		}
 		migration: {
 			enabled: bool | *true
-			image:   string | *"bitnami/kubectl:1.31.0"
+			image:   string | *"registry.k8s.io/kubectl:v1.36.1"
 		}
 		podDisruptionBudget: {
 			enabled:      bool | *true

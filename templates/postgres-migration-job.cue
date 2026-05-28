@@ -29,35 +29,14 @@ import (
 					containers: [{
 						name:  "migrate"
 						image: #config.postgres.migration.image
-						command: [
-							"/bin/bash",
-							"-c",
-							"""
-								set -e
-								STS="\(#helpers.postgresStatefulSetName)"
-								NS="\(#config.metadata.namespace)"
-								SELECTOR="app.kubernetes.io/name=${STS},app.kubernetes.io/instance=\(#config.metadata.name)"
-
-								echo "Checking if StatefulSet migration is needed..."
-								if ! kubectl get statefulset "$STS" -n "$NS" >/dev/null 2>&1; then
-								  echo "No existing StatefulSet found, skipping migration."
-								  exit 0
-								fi
-
-								echo "StatefulSet exists; scaling down (preserving PVCs)..."
-								kubectl scale statefulset "$STS" -n "$NS" --replicas=0
-
-								echo "Waiting for pods to terminate..."
-								if kubectl get pods -n "$NS" -l "$SELECTOR" -o name 2>/dev/null | head -1 | grep -q .; then
-								  # Wait for delete if possible, otherwise just continue
-								  kubectl wait --for=delete pod -l "$SELECTOR" -n "$NS" --timeout=120s || true
-								fi
-
-								echo "Deleting StatefulSet (--cascade=orphan, PVCs preserved)..."
-								kubectl delete statefulset "$STS" -n "$NS" --cascade=orphan
-
-								echo "Migration complete. StatefulSet will be recreated by Timoni."
-								""",
+						args: [
+							"delete",
+							"statefulset",
+							"\(#helpers.postgresStatefulSetName)",
+							"-n",
+							"\(#config.metadata.namespace)",
+							"--cascade=orphan",
+							"--ignore-not-found",
 						]
 					}]
 				}
